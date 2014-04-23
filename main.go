@@ -28,10 +28,13 @@ func getImage() {
 		log.Fatal(err)
 	}
 	defer out.Close()
-	url := "http://" + config.namenode + ":" + config.port + "/getimage?getimage=1&txid=latest"
+	url := "http://" + config.namenode + ":" + config.port + "/imagetransfer?getimage=1&txid=latest"
 	resp, err := http.Get(url)
 	if err != nil {
 		log.Fatal(err)
+	}
+	if resp.StatusCode != 200 {
+		log.Fatal("Problem fetching image. Response was : ", resp.Status)
 	}
 	defer resp.Body.Close()
 	_, err = io.Copy(out, resp.Body)
@@ -56,14 +59,14 @@ func parseImage() {
 	defer file.Close()
 	var count int
 	count = 1
-	delete_command := []string{"fs", "-rm", "-f"}
+	delete_command := []string{"dfs", "-rm", "-f"}
 
 	r := bufio.NewReader(file)
 	line, isPrefix, err := r.ReadLine()
 	for err == nil && !isPrefix {
 		s := string(line)
 		fields := strings.Fields(s)
-		file := fields[7]
+		file := fields[6]
 		//only consider files with specified prefix
 		if !strings.HasPrefix(fields[0], "d") && strings.HasPrefix(file, config.prefix) {
 			t0, _ := time.Parse("2006-01-02", fields[5])
@@ -73,7 +76,7 @@ func parseImage() {
 				if config.delete {
 					if count%config.delete_limit == 0 {
 						deleteFiles(delete_command)
-						delete_command = []string{"fs", "-rm", "-f"}
+						delete_command = []string{"dfs", "-rm", "-f"}
 					} else {
 						delete_command = append(delete_command, file)
 					}
@@ -96,7 +99,7 @@ func parseImage() {
 }
 
 func deleteFiles(delete_command []string) {
-	cmd := exec.Command("hadoop", delete_command...)
+	cmd := exec.Command("hdfs", delete_command...)
 	log.Print(cmd)
 	err := cmd.Run()
 	if err != nil {
